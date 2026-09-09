@@ -1,0 +1,106 @@
+{
+  "_meta": {
+    "description": "사용자 정의 택소노미 확장. configs/commerce_cs.json은 절대 수정하지 않고 이 파일에만 저장한다.",
+    "usage": "PLAYBOOK 00단계에서 commerce_cs.json과 이 파일을 병합 로드한다.",
+    "how_to_add": "EXTENDING.md의 체크리스트 6개 필드를 모두 채운 후 아래 extensions 배열에 추가. 확장 마법사가 자동으로 작성한다.",
+    "status_values": {
+      "draft": "실발화 근거 2건 미만. 분류에는 사용하되 리포트·Priority 해석 시 '잠정' 표기 유지. 근거 2건 이상 확보 시 confirmed으로 승격.",
+      "confirmed": "실발화 근거 2건 이상. 정식 카테고리."
+    }
+  },
+  "extensions": [
+    {
+      "id": "K",
+      "name": "재고·물류 가용성",
+      "status": "confirmed",
+      "confirmed_at": "2026-09-09",
+      "fields": {
+        "definition": "상품 품절·재고 부족·입고 지연·입고 일정 문의·재입고 알림 신청 등, 재고와 물류 가용성 전반에 관한 고객 문의",
+        "include_examples": [
+          { "source": "real", "voc_id": "HF137", "text": "입고 지연 사유가 궁금해요" },
+          { "source": "real", "voc_id": "72XF1", "text": "품절 상품 재입고는 언제인가요" },
+          { "source": "real", "voc_id": "12G7X", "text": "재입고 알림 신청이 가능한가요" },
+          { "source": "real", "voc_id": "414IR", "text": "다음 입고 일정이 궁금합니다" }
+        ],
+        "exclude_and_route": [
+          { "pattern": "이미 발송된 상품의 배송 지연", "route": "A" },
+          { "pattern": "주문 취소 후 환불", "route": "C" },
+          { "pattern": "결제 실패", "route": "F" }
+        ],
+        "cause_tags": ["[판매자]", "[?불명]"],
+        "cause_notes": "[판매자]: 재고 관리·예측 미흡 / [?불명]: 공급망 외부 요인",
+        "actions": [
+          { "id": "K-a1", "name": "재고 현황·입고 일정 고객 안내 프로세스 정비" },
+          { "id": "K-a2", "name": "재입고 알림 기능 확대 (상품MD·물류팀 협업)" }
+        ],
+        "metrics": [
+          { "name": "토픽 VOC 비중" },
+          { "name": "토픽 추세(Trend)", "note": "Trend 상승 시 공급망 이슈 신호" }
+        ]
+      }
+    },
+    {
+      "id": "L",
+      "name": "제품 신뢰성·정품 확인",
+      "status": "draft",
+      "status_note": "real 근거 1건으로 EXTENDING.md 최소 기준(2건) 미달",
+      "confirmed_at": "2026-09-09",
+      "fields": {
+        "definition": "정품 여부·유통 진위·인증 표시 등 제품의 신뢰성과 진위에 대한 고객 문의. 하자·교환 요청은 C로 분류",
+        "include_examples": [
+          { "source": "real", "voc_id": "8Z6J5", "text": "정품인지 확인하고 싶어요" },
+          { "source": "임의 예시", "voc_id": null, "text": "받은 제품 패키지 디자인이 공식 홈페이지에 있는 것이랑 달라요. 혹시 짝퉁 아닌가요?" },
+          { "source": "임의 예시", "voc_id": null, "text": "정품 시리얼 번호로 인증을 해보려 했는데 등록이 안 된다고 뜨네요. 제품이 진짜인지 확인해주세요." },
+          { "source": "임의 예시", "voc_id": null, "text": "이 판매자가 공식 판매처가 맞나요? 가격이 너무 저렴해서 정품인지 걱정이 됩니다." }
+        ],
+        "exclude_and_route": [
+          { "pattern": "실제 하자·불량", "route": "C/C1" },
+          { "pattern": "사용법 문의", "route": "J" },
+          { "pattern": "수리·A/S", "route": "I" },
+          { "pattern": "판매자 인가 여부가 주된 경우", "route": "E" }
+        ],
+        "cause_tags": ["[판매자]", "[택배사]", "[?불명]"],
+        "cause_notes": "[판매자]: 정품 표시·패키징 미흡 / [택배사]: 배송 중 라벨·봉인 손상 / [?불명]: 고객 의심 단계",
+        "actions": [
+          { "id": "L-a1", "name": "정품 확인 절차 표준화 및 고객 안내 (QR·시리얼 검증 링크 제공)" },
+          { "id": "L-a2", "name": "패키징 개선 검토 — 상품개발팀 협업, VOC 추세로 트리거" }
+        ],
+        "metrics": [
+          { "name": "토픽 VOC 비중" },
+          { "name": "토픽 추세(Trend)", "note": "Trend 상승 시 패키징·인증 변경 검토 신호" }
+        ]
+      }
+    },
+    {
+      "id": "M",
+      "name": "채널 접근성 장애",
+      "status": "draft",
+      "status_note": "real 근거 1건으로 EXTENDING.md 최소 기준(2건) 미달",
+      "confirmed_at": "2026-09-09",
+      "fields": {
+        "definition": "고객센터 연결 불가, 앱·홈페이지 접속 오류 등 서비스 채널에 물리적·기술적으로 접근하지 못하는 상황에 관한 문의",
+        "include_examples": [
+          { "source": "real", "voc_id": "1T0I2", "text": "고객센터 연결이 계속 안돼요" },
+          { "source": "임의 예시", "voc_id": null, "text": "앱이 계속 로딩만 되고 아무것도 안 열려요. 문의를 남기고 싶은데 접속 자체가 안 되네요." },
+          { "source": "임의 예시", "voc_id": null, "text": "홈페이지 채팅 상담 버튼을 눌러도 아무 반응이 없어요. 전화도 안 되고 어디에 문의해야 하나요?" },
+          { "source": "임의 예시", "voc_id": null, "text": "콜센터 전화했더니 30분 넘게 기다리다가 자동으로 끊겼어요. 연락할 방법이 없어서 답답합니다." }
+        ],
+        "exclude_and_route": [
+          { "pattern": "결제 진행 불가(시스템 오류)", "route": "F/F2" },
+          { "pattern": "회원정보 변경 실패", "route": "H" },
+          { "pattern": "앱 내 주문·결제 기능 오류", "route": "F 또는 H (기능에 따라 판정)" }
+        ],
+        "cause_tags": ["[플랫폼/시스템]", "[?불명]"],
+        "cause_notes": "[플랫폼/시스템]: 콜센터 과부하·앱 서버 장애 / [?불명]: 원인 미특정",
+        "actions": [
+          { "id": "M-a1", "name": "콜센터 연결 대기시간 단축 및 대체 채널(챗봇·앱채팅) 안내" },
+          { "id": "M-a2", "name": "채널 접근성 모니터링 체계 구축 (VOC 급증 → IT운영팀 즉시 알림)" }
+        ],
+        "metrics": [
+          { "name": "토픽 VOC 비중" },
+          { "name": "토픽 추세(Trend)", "note": "단기 급증 시 시스템 장애 조기 경보 신호" }
+        ]
+      }
+    }
+  ]
+}

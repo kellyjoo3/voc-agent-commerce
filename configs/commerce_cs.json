@@ -1,0 +1,556 @@
+{
+  "_meta": {
+    "config_version": "1.0.0",
+    "source": "원본 context/*.md 및 reference_output/ 파일에서 직접 이관. 재구성·창작 없음.",
+    "taxonomy_source": "context/topic_taxonomy.md v1.1",
+    "cause_source": "context/cause_taxonomy.md v1.0",
+    "action_source": "context/action_playbook.md v1.0",
+    "metric_source": "context/metric_dictionary.md v1.0",
+    "filter_source": "reference_output/domain_filter.py DOMAIN_RULES",
+    "priority_source": "PROJECT_SPEC.md §6 확정 사양",
+    "integrity_note": "이 파일은 원본 무결성 보존 대상이다. 사용자 확장은 configs/local_extensions.json 에만 저장할 것. EXTENDING.md 참조."
+  },
+
+  "domain": {
+    "name": "commerce_cs",
+    "description": "이커머스 고객센터(CS) VOC 분석 도메인. 주문~배송~반품 플로우를 전제로 한다.",
+    "unit_of_analysis": "VOC 1건 = 고객 발화(또는 문의/리뷰) 1건의 텍스트",
+    "reference_model_note": "본 config는 이커머스 CS 일반 참조 모델(Reference Model)이며, 특정 기업의 실제 운영 정책이 아니다."
+  },
+
+  "taxonomy": {
+    "_source": "context/topic_taxonomy.md v1.1",
+    "structure": "2계층 — 대분류 10개 + 기타 / 중분류 28개 (null 허용)",
+    "basis": "전량 15,163건 임베딩·군집화(K=12) → 사람이 원문 검토 후 2계층으로 재설계",
+
+    "classification_rules": [
+      {
+        "rule_id": "R1",
+        "title": "대분류 필수, 중분류 선택(null 허용)",
+        "description": "대분류는 반드시 하나 배정. 중분류는 사유가 텍스트에 드러날 때만 배정하고, 불명확하면 null로 비워둔다. 억지 배정 금지."
+      },
+      {
+        "rule_id": "R2",
+        "title": "판정 우선순위 (한 발화에 여러 요소가 섞일 때)",
+        "description": "① 고객의 실제 요청(action)이 무엇인가 → 대분류 결정 / ② 그 요청의 사유가 무엇인가 → 중분류 결정 / ③ 사유가 안 드러나면 중분류 = null"
+      },
+      {
+        "rule_id": "R3",
+        "title": "대분류 판별 3축",
+        "axes": [
+          {"axis": 1, "question": "상품을 되돌리려는 요청인가?", "branch": "아니오 → A(기다림) / 예 → B·C"},
+          {"axis": 2, "question": "요청 시점에 상품을 받았는가?", "branch": "미수령 → B 취소 / 수령 → C 반품"},
+          {"axis": 3, "question": "내 건의 처리인가, 일반 절차 질문인가?", "branch": "내 건 → A·B·C / 일반 질문 → E 절차문의"}
+        ]
+      }
+    ],
+
+    "boundary_rules": [
+      {"id": 1, "boundary": "배송 지연 ↔ 취소", "rule": "요청이 무엇인가로 결정. 기다리는 중 → A1 / 취소하겠다 → B2"},
+      {"id": 2, "boundary": "교환 ↔ A/S", "rule": "해결 수단으로 결정. 새 상품 요구 → C1 / 수리 요구 → I"},
+      {"id": 3, "boundary": "주문 접수 ↔ 배송 지연", "rule": "D는 신규 주문·변경으로 한정. '주문했는데 안 와요' → A1"},
+      {"id": 4, "boundary": "절차 문의 독립 유지", "rule": "E는 독립 대분류. FAQ·사전공지로 해결됐어야 할 인입이라 별도 집계 가치가 있음"},
+      {"id": 5, "boundary": "결제 ↔ 환불", "rule": "'환불은 어떻게 받나요(카드결제)' → C. 질문 요지가 환불, 결제수단은 조건"},
+      {"id": 6, "boundary": "혜택 ↔ 계정", "rule": "혜택 내용 중심 → G / 가입·계정 행위 중심 → H"},
+      {"id": 7, "boundary": "A/S 품목 구분", "rule": "품목별로 분리 (IT기기 / 생활가전 / TV). 자가조치 여부는 분류하지 않음"},
+      {"id": 8, "boundary": "사유 불명", "rule": "중분류를 비워둔다. 억지 배정 금지"}
+    ],
+
+    "output_format": {
+      "description": "대분류/중분류를 한 번의 호출에서 쌍으로 출력",
+      "example_with_minor": "{\"major\": \"C\", \"minor\": \"C1\"}",
+      "example_without_minor": "{\"major\": \"C\", \"minor\": null}"
+    },
+
+    "major": [
+      {
+        "id": "A",
+        "name": "배송 지연·미도착",
+        "estimated_share_pct": 10.2,
+        "guideline": {
+          "definition": "주문·결제한 상품의 배송 진행 상황에 대한 문의·불만. 상품을 기다리는 중이며 취소·반품 요청은 아니다.",
+          "exclude": [
+            {"pattern": "안 와서 취소하겠다", "route_to": "B2"},
+            {"pattern": "받았는데 문제가 있어 반품", "route_to": "C"},
+            {"pattern": "배송 정책·비용 일반 문의", "route_to": "E1"},
+            {"pattern": "배송지 변경", "route_to": "E3"}
+          ]
+        },
+        "minor": [
+          {
+            "id": "A1",
+            "name": "배송 지연·미도착",
+            "definition": "예정보다 늦거나 도착하지 않음",
+            "examples": ["이 주가 지났거든요 그런데 도착을 안 해서", "십이 일이 넘어가는데 아직도 안 와서요 지금 배송이 왜 안 되는 겁니까"]
+          },
+          {
+            "id": "A2",
+            "name": "배송완료 표시·미수령",
+            "definition": "시스템상 완료인데 실물 미수령",
+            "examples": ["배달이 완료되었대요 근데 물건은 집에 안 왔거든요", "택배 쪽은 배송 완료라고 떠있는데요 아직 못 받았어요"]
+          },
+          {
+            "id": "A3",
+            "name": "배송 조회·일정 확인",
+            "definition": "지연 아님. 위치·예상일 단순 확인",
+            "examples": ["주문 결제 후에 배송 기간은 얼마나 소요되나요", "배송 조회는 어디서 할 수 있어요"]
+          }
+        ]
+      },
+      {
+        "id": "B",
+        "name": "주문 취소 (배송 전)",
+        "estimated_share_pct": 3.3,
+        "guideline": {
+          "definition": "상품을 아직 받지 않은 상태에서 주문을 무르려는 요청.",
+          "exclude": [
+            {"pattern": "상품 수령 후 되돌림", "route_to": "C"},
+            {"pattern": "취소 방법만 묻는 일반 질문", "route_to": "E3"},
+            {"pattern": "취소했는데 환불이 안 됨", "route_to": "C4"}
+          ]
+        },
+        "minor": [
+          {
+            "id": "B1",
+            "name": "단순변심 취소",
+            "definition": "고객 사유의 취소",
+            "examples": ["상품을 지금 취소하려는데요 전부다 취소하는 게 아니라 #@상품# 하나만"]
+          },
+          {
+            "id": "B2",
+            "name": "배송지연 사유 취소",
+            "definition": "안 와서 취소",
+            "examples": ["오늘도 발송 안 되면 취소 할게요", "이틀 뒤에 취소해달라고 전화를 했는데 벌써 발송됐다"]
+          },
+          {
+            "id": "B3",
+            "name": "부분출고·품절 취소",
+            "definition": "재고·출고 문제로 인한 취소",
+            "examples": ["결제까지 다 했는데 품절이 되었어요 그러면 주문 취소된 거니 환불해 주세요", "묶음 상품 구매 후 일부만 취소가 가능할까요"]
+          }
+        ]
+      },
+      {
+        "id": "C",
+        "name": "반품·교환·환불 (배송 후)",
+        "estimated_share_pct": 8.6,
+        "guideline": {
+          "definition": "상품을 받은 후 반품·교환·환불하려는 요청 및 그 처리 상황.",
+          "exclude": [
+            {"pattern": "미수령 상태 취소", "route_to": "B"},
+            {"pattern": "반품·교환 정책·비용 일반 질문", "route_to": "E2"},
+            {"pattern": "제품 고장을 수리로 해결하려는 경우", "route_to": "I"}
+          ]
+        },
+        "minor": [
+          {
+            "id": "C1",
+            "name": "제품 하자·불량·파손",
+            "definition": "제품 자체 결함",
+            "examples": ["하자상품이 배송되었네요 제품 아래에 고무밴드가 끊어져서 왔네요", "다 녹아서 왔는데 상한 냄새나요", "찌그러져서 와서 사진도 올리고"]
+          },
+          {
+            "id": "C2",
+            "name": "오배송·구성품 누락",
+            "definition": "다른 상품·수량 부족",
+            "examples": ["반지 세 개 세트인데 링 하나가 없어요", "#@제품#만 누락되고 다른 제품은 정상 도착했어요"]
+          },
+          {
+            "id": "C3",
+            "name": "단순변심 반품",
+            "definition": "고객 사유(사이즈·색상·마음)",
+            "examples": ["마음에 안들어서 반품하고 싶은데요", "본 색상은 네이비인데요 약간 보라색이 섞여있어요"]
+          },
+          {
+            "id": "C4",
+            "name": "반품·환불 처리지연",
+            "definition": "수거·환불이 진행되지 않음",
+            "examples": ["반품 수거를 아직 안 해서요", "엊그제 반품하고 받으셨을 텐데 환불이 안 돼서요", "회수를 안 해가셔서요"]
+          }
+        ]
+      },
+      {
+        "id": "D",
+        "name": "상품 주문 접수",
+        "estimated_share_pct": 10.3,
+        "guideline": {
+          "definition": "전화 등으로 상품을 새로 주문하거나 기존 주문을 추가·변경하는 요청. 상품 스펙·가격 확인이 동반된다.",
+          "exclude": [
+            {"pattern": "결제 수단·오류", "route_to": "F"},
+            {"pattern": "주문한 게 안 옴", "route_to": "A1"},
+            {"pattern": "주문 방법만 묻는 일반 질문", "route_to": "E3"}
+          ]
+        },
+        "minor": [
+          {
+            "id": "D1",
+            "name": "신규 상품 주문",
+            "definition": "새 주문 접수",
+            "examples": ["#@상품# 구매하려고 합니다 강약 조절되는 건가요", "퍼팅 연습기구 하나 주문해주세요"]
+          },
+          {
+            "id": "D2",
+            "name": "주문 추가·변경",
+            "definition": "기존 주문에 추가·구성 변경",
+            "examples": ["금방 주문했는데요 #@상품#을 추가로 좀 해줬으면 해서", "혼합구성으로 선택했는데 구성변경이 가능한가요"]
+          }
+        ]
+      },
+      {
+        "id": "E",
+        "name": "절차·정책 문의",
+        "estimated_share_pct": 7.8,
+        "guideline": {
+          "definition": "내 건의 처리 요청이 아니라 '어떻게 하나요 / 가능한가요'를 묻는 절차·정책 질의.",
+          "note": "E 전체가 FAQ·셀프서비스 개선의 1차 소재.",
+          "exclude": [
+            {"pattern": "내 주문·반품의 실제 처리", "route_to": "A·B·C"},
+            {"pattern": "혜택 사용 방법", "route_to": "G"},
+            {"pattern": "계정 관련 방법", "route_to": "H"}
+          ]
+        },
+        "minor": [
+          {
+            "id": "E1",
+            "name": "배송 정책·방법",
+            "definition": "배송비·택배사·묶음배송·안심택배 등",
+            "examples": ["배송비는 상품별로 각각 적용되나요", "안심택배 서비스는 뭔가요"]
+          },
+          {
+            "id": "E2",
+            "name": "반품·교환 정책",
+            "definition": "반품 가능 기간·비용·조건",
+            "examples": ["무료배송 상품을 교환할 경우 배송비가 얼마인가요", "교환이나 반품이 불가한 경우는 어떤 것이 있나요"]
+          },
+          {
+            "id": "E3",
+            "name": "주문·결제 절차",
+            "definition": "주문·취소·조회 방법",
+            "examples": ["비회원으로 주문했는데 주문 조회는 어떻게 하나요", "주문한 거 취소하고 싶으면 어떻게 해요"]
+          }
+        ]
+      },
+      {
+        "id": "F",
+        "name": "결제 방법·오류",
+        "estimated_share_pct": 8.9,
+        "guideline": {
+          "definition": "결제 수단·과정·증빙에 관한 문의와 오류.",
+          "exclude": [
+            {"pattern": "환불 요청 자체", "route_to": "C"},
+            {"pattern": "포인트·쿠폰으로 할인", "route_to": "G"}
+          ]
+        },
+        "minor": [
+          {
+            "id": "F1",
+            "name": "결제수단·복합결제",
+            "definition": "카드/현금/무통장/간편결제, 복합결제",
+            "examples": ["카드와 현금으로 복합 결제 가능한가요", "무통장 입금계좌 다시 한 번 보내주시겠어요"]
+          },
+          {
+            "id": "F2",
+            "name": "결제 실패·오류",
+            "definition": "결제가 진행되지 않음",
+            "examples": ["결제하려는데 계속 오류가 나요 장바구니에서 결제를 누르면 다음으로 넘어가질 않아요"]
+          },
+          {
+            "id": "F3",
+            "name": "영수증·증빙",
+            "definition": "현금영수증·세금계산서",
+            "examples": ["현금 영수증을 발급을 받고 싶거든요", "지출증빙용 현금영수증은 어디에서 확인 하나요"]
+          }
+        ]
+      },
+      {
+        "id": "G",
+        "name": "혜택·적립",
+        "estimated_share_pct": 9.3,
+        "guideline": {
+          "definition": "쿠폰·포인트·적립금·이벤트·사은품 등 혜택의 사용법·조건·확인.",
+          "exclude": [
+            {"pattern": "가입·계정 행위 중심 (혜택 내용 중심이면 G)", "route_to": "H"},
+            {"pattern": "혜택 적용 실패로 결제가 안 됨", "route_to": "F2"}
+          ]
+        },
+        "minor": [
+          {
+            "id": "G1",
+            "name": "쿠폰",
+            "definition": "쿠폰 사용·중복적용·유효기간",
+            "examples": ["쿠폰이 여러 개가 있는데 동시에 사용 가능한가요", "한 상품에 여러 쿠폰을 적용할 수도 있나요"]
+          },
+          {
+            "id": "G2",
+            "name": "포인트·적립금",
+            "definition": "적립·사용·소멸·전환",
+            "examples": ["포인트가 적립 가능한 한도가 있을까요", "리뷰를 작성하면 포인트를 주나요"]
+          },
+          {
+            "id": "G3",
+            "name": "이벤트·사은품",
+            "definition": "이벤트 참여·당첨·증정품",
+            "examples": ["사은품 안내받고 싶어서요 증정 기준으로 알려주세요"]
+          }
+        ]
+      },
+      {
+        "id": "H",
+        "name": "계정·회원 관리",
+        "estimated_share_pct": 7.0,
+        "guideline": {
+          "definition": "회원가입·탈퇴·로그인·회원정보 등 계정 자체에 관한 문의.",
+          "exclude": [
+            {"pattern": "회원 혜택 내용", "route_to": "G2"}
+          ]
+        },
+        "minor": [
+          {
+            "id": "H1",
+            "name": "가입·탈퇴",
+            "definition": "가입·재가입·탈퇴",
+            "examples": ["회원 탈퇴는 어떻게 하나요", "회원가입을 하려고 하는데요 자꾸 이미 등록된 회원입니다 라는 메세지가"]
+          },
+          {
+            "id": "H2",
+            "name": "로그인·비밀번호",
+            "definition": "로그인 실패, 아이디·비번 분실",
+            "examples": ["아이디하고 비밀번호를 몰라서요", "비밀번호를 까먹었는데 어떻게 해야 하죠"]
+          },
+          {
+            "id": "H3",
+            "name": "회원정보 변경",
+            "definition": "정보·아이디 변경",
+            "examples": ["회원 정보를 변경하라고 안내가 떠서요", "회원정보를 변경하고 싶은데요"]
+          }
+        ]
+      },
+      {
+        "id": "I",
+        "name": "제품 A/S (고장·수리)",
+        "estimated_share_pct": 17.2,
+        "guideline": {
+          "definition": "구매한 제품의 고장·오작동에 대한 수리 상담·접수. 품질·서비스망 문제.",
+          "note": "자가조치 가능 여부(고객 스스로 해결 vs 기사 방문)는 이 단계에서 분류하지 않는다. 증상별 판단에 도메인 지식이 필요하고 공개 데이터에는 없다.",
+          "exclude": [
+            {"pattern": "고장을 새 상품 교환·반품으로 해결하려는 경우", "route_to": "C1"},
+            {"pattern": "고장이 아닌 사용법·관리 문의", "route_to": "J1"},
+            {"pattern": "제품 구매 전 스펙 문의", "route_to": "D1"}
+          ]
+        },
+        "minor": [
+          {
+            "id": "I1",
+            "name": "IT기기 A/S·설정",
+            "definition": "휴대폰·PC·모니터·주변기기 고장·설정",
+            "examples": ["휴대폰이랑 피씨를 연결 하려는데 안 돼서요", "모니터에 화면이 안 나와요"]
+          },
+          {
+            "id": "I2",
+            "name": "생활가전 A/S",
+            "definition": "세탁기·냉장고·에어컨·정수기·청소기 등 고장",
+            "examples": ["탈수는 되는데 세탁할 때 소음이 나고", "세탁기가 고장나가지구여 에이에스 좀 받을려구여"]
+          },
+          {
+            "id": "I3",
+            "name": "TV A/S",
+            "definition": "TV 화면 이상·고장",
+            "examples": ["티비가 잘 안나와서 화면이 좀 깨지고요 지지직 거려요", "티비 에이에스 좀 받으려고 하거든요"]
+          }
+        ]
+      },
+      {
+        "id": "J",
+        "name": "제품 사용법·문의",
+        "estimated_share_pct": 8.6,
+        "guideline": {
+          "definition": "고장이 아닌, 제품의 사용법·관리·세척·재질·유통기한 등 정보성 문의. 매뉴얼·FAQ로 해결 가능한 성격.",
+          "note": "I(품질 문제)와 J(정보 제공 문제)는 원인·대응이 다르다. I는 서비스망·부품·품질관리로, J는 매뉴얼·FAQ·상세페이지 개선으로 이어진다.",
+          "exclude": [
+            {"pattern": "고장·오작동으로 수리 필요", "route_to": "I"},
+            {"pattern": "제품 구매 전 스펙 문의(주문 동반)", "route_to": "D1"}
+          ]
+        },
+        "minor": [
+          {
+            "id": "J1",
+            "name": "제품 사용법·관리",
+            "definition": "사용·세척·보관·재질·유통기한·소모품 교체",
+            "examples": ["용기 및 블레이드는 어떻게 관리하나요", "물세탁 가능한가요 건조는 어떻게 하죠", "클린커버의 교체 주기가 있나요"]
+          }
+        ]
+      },
+      {
+        "id": "기타",
+        "name": "기타",
+        "guideline": {
+          "definition": "어느 대분류에도 속하지 않거나, 내용이 아니라 말투·문장구조로 묶인 발화.",
+          "note": "기타 비율은 지표로 기록한다. 과다하면 택소노미에 빠진 유형이 있다는 신호다. 15% 초과 시 PLAYBOOK 확장 마법사가 발동한다.",
+          "examples": ["#@이름#입니다 #@주소#요 동의합니다 언제까지 통화해야 하나요 (신원확인·정보제공 동의만 있고 이슈 내용 없음)"]
+        },
+        "minor": []
+      }
+    ]
+  },
+
+  "filters": {
+    "_source": "reference_output/domain_filter.py DOMAIN_RULES — 500건 검증에서 실제 발견된 업종외 혼입 사례를 근거로 구성",
+    "note": "명백한 업종외 패턴만 격리(삭제 아님). 애매한 잔여건은 06 Topic 분류에서 AI가 '기타'로 자연 처리한다.",
+    "exclude_patterns": {
+      "여행/숙박/항공": "항공권|호텔예약|레저베이션|골프장|라운지 이용|탑승자|국내선|국제선|숙소 배정|여행을 취소|여행 상품",
+      "게임": "영웅|경험치|스테이지|각성|길드|팬텀|게임 유저|접속이 끊긴 카메라",
+      "렌탈/구독/대여": "렌탈 서비스|대여하려고|명의.{0,4}이전|해지하고 싶|의무사용기간|양도 받을만한",
+      "통신/개통": "개통.{0,4}확인서|통신사로|일련번호를 쓰라고|가족.{0,6}추가.{0,6}할인",
+      "행정/공공": "인감을|인감증명|코로나 백신|시설공사|하자 보증기간|주요 공종",
+      "B2B/판매자 관점": "입점 관련|하위거래처|판매 하고 있는 상품이 품절로 인하여|배송 관리로 들어가서 판매 취소",
+      "오프라인 서비스 예약": "전시장에서 견적|레스토랑|런치.{0,4}디너|매장.{0,4}방문.{0,10}예약|상담 예약을 하고 싶은데",
+      "디지털콘텐츠/플랫폼": "다운로드가 안되네요|이용권은 전체일정|팔로우하고 싶은데|카메라도 지난 이벤트"
+    },
+    "threshold_warning_pct": 5.0,
+    "threshold_warning_message": "생각보다 이커머스 외 데이터가 많이 섞여 있습니다. CSV 출처를 확인해보시겠어요? (원 프로젝트 실측 정상 범주: 1.03%)"
+  },
+
+  "cause_tags": {
+    "_source": "context/cause_taxonomy.md v1.0 — 귀책 주체 태그",
+    "tags": ["[판매자]", "[택배사]", "[플랫폼/시스템]", "[고객]", "[정보/매뉴얼]", "[?불명]"],
+    "usage_note": "LLM은 이 목록에서 원인을 선택·조합하고, 각 가설에 실제 voc_id를 인용한다. 목록에 없는 원인을 지어내지 않는다."
+  },
+
+  "sentiment_scale": [
+    {"label": "Positive",       "score": 0, "description": "긍정적 또는 중립적 문의. 불만·요구 없음."},
+    {"label": "Neutral",        "score": 1, "description": "사실 확인·단순 문의. 감정 중립."},
+    {"label": "Negative",       "score": 3, "description": "불만·불편·실망. 해결 요구."},
+    {"label": "Severe Negative","score": 5, "description": "강한 항의·분노·반복 불만. 격앙된 표현."}
+  ],
+  "sentiment_classification_rule": {
+    "greeting_exclusion": "'안녕하세요', '감사합니다', '수고하세요' 같은 시작·종료 인사는 감정 판단에서 무시한다. 문의·불만의 본문 내용만으로 판단한다. 이 규칙을 누락하면 대부분의 VOC가 Positive로 오분류된다.",
+    "basis": "고객의 실제 문의·불만 내용을 기준으로 4단계 중 하나를 부여한다.",
+    "s_score_formula": "S_score = sentiment_score_mean / 5 × 100 (0~100 표준화)"
+  },
+
+  "playbook": {
+    "_source": "context/action_playbook.md v1.0",
+    "type_tags": ["[프로세스]", "[시스템]", "[콘텐츠/FAQ]", "[협력사관리]", "[정책]"],
+    "usage_note": "LLM은 이 목록에서 Action을 선택하고, 기대효과(Frequency 기반)와 Success Metric(metrics.primary에서 선택)을 붙인다. 목록에 없는 조치를 지어내지 않는다.",
+    "actions": [
+      {"id": "A-a1", "name": "출고 SLA 설정·모니터링 (송장 미등록 알림)", "cause": ["A-c1", "A-c2"], "type": "[프로세스]", "metric": "배송 관련 VOC 비중, 평균 출고 소요"},
+      {"id": "A-a2", "name": "배송 지연 사전 알림 자동 발송", "cause": ["A-c3", "A-c5"], "type": "[시스템]", "metric": "배송 조회 문의 비중"},
+      {"id": "A-a3", "name": "택배사 정체 실시간 안내 (지연 사유 표시)", "cause": ["A-c3"], "type": "[시스템]", "metric": "A3 조회 문의 비중"},
+      {"id": "A-a4", "name": "완료 오처리 검증 루틴 (미수령 신고 fast-track)", "cause": ["A-c4"], "type": "[프로세스]", "metric": "A2 미수령 VOC 건수"},
+      {"id": "B-a1", "name": "취소 요청 즉시 발송 보류 연동 (취소-출고 동기화)", "cause": ["B-c4"], "type": "[시스템]", "metric": "취소 후 오발송 건수"},
+      {"id": "B-a2", "name": "품절 사전 표시·예약 재고 관리", "cause": ["B-c2"], "type": "[시스템]", "metric": "부분출고·품절 취소 비중"},
+      {"id": "B-a3", "name": "셀프 취소 UI 개선 (배송 전 단계)", "cause": ["B-c3"], "type": "[시스템]", "metric": "취소 관련 문의 비중"},
+      {"id": "C-a1", "name": "입고 검수 강화 (하자·오배송 사전 차단)", "cause": ["C-c1", "C-c3"], "type": "[프로세스]", "metric": "하자·오배송 반품 비중"},
+      {"id": "C-a2", "name": "배송 파손 보상·포장 개선 (택배사 협의)", "cause": ["C-c2"], "type": "[협력사관리]", "metric": "파손 반품 건수"},
+      {"id": "C-a3", "name": "회수 SLA 단축·기사 배정 자동화", "cause": ["C-c5"], "type": "[프로세스]", "metric": "반품 처리지연 VOC 비중"},
+      {"id": "C-a4", "name": "환불 처리 기간 단축·진행 상태 알림", "cause": ["C-c6"], "type": "[시스템]", "metric": "환불 지연 문의 건수"},
+      {"id": "C-a5", "name": "상세페이지 정보 강화 (변심 반품 예방)", "cause": ["C-c4"], "type": "[콘텐츠/FAQ]", "metric": "단순변심 반품 비중"},
+      {"id": "D-a1", "name": "온라인 주문 플로우 UX 개선 (전화 전환 원인 분석)", "cause": ["D-c1"], "type": "[시스템]", "metric": "전화 주문 인입 비중"},
+      {"id": "D-a2", "name": "상품 상세 정보·옵션 안내 강화", "cause": ["D-c2"], "type": "[콘텐츠/FAQ]", "metric": "구매 전 문의 비중"},
+      {"id": "E-a1", "name": "FAQ 재정립 (인입 상위 절차 문의 우선)", "cause": ["E-c1"], "type": "[콘텐츠/FAQ]", "metric": "절차·정책 문의 비중"},
+      {"id": "E-a2", "name": "정책 안내 접근성 개선 (경로 단순화)", "cause": ["E-c2"], "type": "[시스템]", "metric": "E 문의 비중, 자가해결률"},
+      {"id": "F-a1", "name": "결제 시스템 안정성 점검·오류 로깅", "cause": ["F-c1"], "type": "[시스템]", "metric": "결제 실패 문의 건수"},
+      {"id": "F-a2", "name": "결제수단별 안내 강화 (제약 사전 표시)", "cause": ["F-c2", "F-c3"], "type": "[콘텐츠/FAQ]", "metric": "결제수단 문의 비중"},
+      {"id": "G-a1", "name": "혜택 안내 단순화·통합 페이지", "cause": ["G-c1"], "type": "[콘텐츠/FAQ]", "metric": "혜택 문의 비중"},
+      {"id": "G-a2", "name": "적립·지급 시점 명시 (마이페이지 표시)", "cause": ["G-c2"], "type": "[시스템]", "metric": "적립 관련 문의 건수"},
+      {"id": "H-a1", "name": "로그인·비밀번호 찾기 플로우 개선", "cause": ["H-c1"], "type": "[시스템]", "metric": "로그인 문의 비중"},
+      {"id": "H-a2", "name": "회원 통합·전환 안내 강화", "cause": ["H-c2"], "type": "[콘텐츠/FAQ]", "metric": "가입 오류 문의 건수"},
+      {"id": "H-a3", "name": "탈퇴·정보변경 경로 안내 (FAQ)", "cause": ["H-c3"], "type": "[콘텐츠/FAQ]", "metric": "계정 문의 비중"},
+      {"id": "I-a1", "name": "증상별 자가조치 매뉴얼 제작 (내부 협의 필요)", "cause": ["I-c2"], "type": "[콘텐츠/FAQ]", "metric": "A/S 문의 중 자가해결 전환율"},
+      {"id": "I-a2", "name": "재발 이력 관리·품질 피드백 (제조 연동)", "cause": ["I-c1", "I-c3"], "type": "[협력사관리]", "metric": "재고장 A/S 비중"},
+      {"id": "I-a3", "name": "품목별 A/S 접수 채널 분리", "cause": [], "type": "[프로세스]", "metric": "A/S 접수 처리 시간"},
+      {"id": "J-a1", "name": "상세페이지에 사용법·관리·재질 정보 표준화", "cause": ["J-c1"], "type": "[콘텐츠/FAQ]", "metric": "사용법 문의 비중"},
+      {"id": "J-a2", "name": "상품 정보 정합성 검증 (박스/제품 표기 일치)", "cause": ["J-c2"], "type": "[프로세스]", "metric": "정보 불일치 문의 건수"}
+    ]
+  },
+
+  "metrics": {
+    "_source": "context/metric_dictionary.md v1.0",
+    "note": "1차(VOC 관측)는 본 MVP에서 측정. 2차(사업)는 연결 지점만 명시 — 유관부서가 별도 산출.",
+    "primary": [
+      {
+        "id": "M1",
+        "name": "토픽 VOC 비중",
+        "definition": "특정 토픽이 전체 VOC에서 차지하는 %",
+        "formula": "토픽 VOC수 ÷ 전체 VOC수 × 100",
+        "linked_secondary": "CS 처리 건수·비용"
+      },
+      {
+        "id": "M2",
+        "name": "부정 감정 비율",
+        "definition": "토픽 내 Negative+Severe Negative 비율",
+        "formula": "부정 VOC ÷ 토픽 VOC",
+        "linked_secondary": "CSAT, 이탈률"
+      },
+      {
+        "id": "M3",
+        "name": "토픽 심각도(S_score)",
+        "definition": "감정점수 평균 0~100",
+        "formula": "sentiment_score_mean / 5 × 100 (PROJECT_SPEC §6.2)",
+        "linked_secondary": "NPS, 이탈률"
+      },
+      {
+        "id": "M4",
+        "name": "토픽 추세(Trend)",
+        "definition": "이전 기간 대비 비중 변화율",
+        "formula": "(최근기간 비중 - 직전기간 비중) / 직전기간 비중 × 100 (PROJECT_SPEC §6.3)",
+        "linked_secondary": "문제 확산 속도"
+      },
+      {
+        "id": "M5",
+        "name": "재문의율",
+        "definition": "동일 이슈 반복 인입 정도",
+        "formula": "(근사) 동일 토픽 고빈도 표현",
+        "linked_secondary": "FCR(최초해결률)"
+      },
+      {
+        "id": "M6",
+        "name": "사유 확인율",
+        "definition": "중분류가 배정된 비율 (null 아님)",
+        "formula": "중분류 有 ÷ 토픽 VOC",
+        "linked_secondary": "상담 품질"
+      },
+      {
+        "id": "M7",
+        "name": "자가해결 전환 가능 비중",
+        "definition": "E·J·G 등 FAQ성 문의 비중",
+        "formula": "해당 토픽 VOC 합 ÷ 전체",
+        "linked_secondary": "셀프서비스율, 인당 문의량"
+      }
+    ],
+    "secondary": [
+      {"name": "CS 처리 건수·비용", "requires": "CS 운영 데이터"},
+      {"name": "CSAT / NPS", "requires": "설문 데이터"},
+      {"name": "이탈률(Churn)", "requires": "CRM·구매 데이터"},
+      {"name": "재구매율", "requires": "구매 데이터"},
+      {"name": "FCR (최초 해결률)", "requires": "상담 이력"},
+      {"name": "셀프서비스율", "requires": "채널 데이터"},
+      {"name": "반품·환불 비용", "requires": "물류·재무 데이터"}
+    ]
+  },
+
+  "priority_formula": {
+    "_source": "PROJECT_SPEC.md §6 확정 사양",
+    "formula": "Priority = 0.4·F + 0.4·S + 0.2·T",
+    "note_priority_ne_order": "Priority는 실행 순서가 아니다 (PROJECT_SPEC.md §6.4). S_score 최고 Topic이 P1/P2에 없으면 원인가설 대상에 별도 추가할 것.",
+    "weights": {
+      "F": 0.4,
+      "S": 0.4,
+      "T": 0.2
+    },
+    "F_cap_pct": 20,
+    "f_score_formula": "F_score = min(Frequency_pct / 20, 1) × 100",
+    "trend_score_anchors": [
+      {"trend_raw_pct": -100, "t_score": 0},
+      {"trend_raw_pct": 0,    "t_score": 50},
+      {"trend_raw_pct": 100,  "t_score": 100}
+    ],
+    "trend_min_sample_per_period": 5,
+    "trend_insufficient_score": 50,
+    "grade_rule": {
+      "top_n": 3,
+      "threshold": 50,
+      "description": "P1 = 상위 top_n개 AND Priority ≥ threshold. 나머지 ≥ threshold → P2. 미만 → P3."
+    }
+  }
+}

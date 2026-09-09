@@ -1,0 +1,16 @@
+# 분석 산출물 — 고객 발화 원문 포함. 실수 커밋 방지
+output/
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# 오염 이력 — 배포 불필요
+_quarantine/
+
+# 원본 프로젝트 설계 문서 — 빌드 참고용, 배포 불필요
+briefing_v2.html
+HANDOFF.md

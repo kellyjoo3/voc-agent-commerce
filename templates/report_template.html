@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VOC 분석 리포트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper:#F4F3EF; --surface:#FFFFFF; --sunk:#EBE9E3;
+    --ink:#1A1C26; --ink-2:#43454F; --muted:#6B6D79;
+    --rule:#E1DFD8; --rule-2:#CFCCC3;
+    --ai:#4F45C4; --ai-bg:#EDECFA; --ai-line:#C9C5EE;
+    --code:#1C6A58; --code-bg:#E2F0EB; --code-line:#B6D8CD;
+    --human:#A0501C; --human-bg:#F8EADF; --human-line:#E6C6A9;
+    --done:#2C7A4B; --done-bg:#E4F1E8; --done-line:#B4DCC2;
+    --hot:#B3341F; --hot-bg:#FAE7E3; --hot-line:#EFC2B8;
+    --warn:#8A6D1F; --warn-bg:#F7F0DC; --warn-line:#E2D3A6;
+    --shadow:0 1px 2px rgba(26,28,38,.05), 0 8px 24px -12px rgba(26,28,38,.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#131419; --surface:#1B1D24; --sunk:#212430;
+      --ink:#E9E8E4; --ink-2:#C3C3C7; --muted:#90929D;
+      --rule:#2C2E38; --rule-2:#3D404C;
+      --ai:#ADA6F7; --ai-bg:#232149; --ai-line:#3B3775;
+      --code:#6FD2B5; --code-bg:#102E28; --code-line:#1F4E43;
+      --human:#E8A472; --human-bg:#38241A; --human-line:#5A3A26;
+      --done:#6FC98D; --done-bg:#16301F; --done-line:#265238;
+      --hot:#F09080; --hot-bg:#3A1C16; --hot-line:#5E2E24;
+      --warn:#D9BE72; --warn-bg:#332C15; --warn-line:#544824;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#131419; --surface:#1B1D24; --sunk:#212430;
+    --ink:#E9E8E4; --ink-2:#C3C3C7; --muted:#90929D;
+    --rule:#2C2E38; --rule-2:#3D404C;
+    --ai:#ADA6F7; --ai-bg:#232149; --ai-line:#3B3775;
+    --code:#6FD2B5; --code-bg:#102E28; --code-line:#1F4E43;
+    --human:#E8A472; --human-bg:#38241A; --human-line:#5A3A26;
+    --done:#6FC98D; --done-bg:#16301F; --done-line:#265238;
+    --hot:#F09080; --hot-bg:#3A1C16; --hot-line:#5E2E24;
+    --warn:#D9BE72; --warn-bg:#332C15; --warn-line:#544824;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Sans KR", system-ui, -apple-system, "Malgun Gothic", sans-serif;
+    font-size:15.5px; line-height:1.72; font-weight:400;
+    -webkit-font-smoothing:antialiased; word-break:keep-all;
+  }
+  .wrap { max-width:1040px; margin:0 auto; padding:0 24px 96px; }
+  .mono { font-family:"IBM Plex Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+
+  /* ── masthead ── */
+  .masthead { padding:64px 0 32px; border-bottom:2px solid var(--ink); }
+  .eyebrow {
+    font-family:"IBM Plex Mono", monospace; font-size:11px; font-weight:500;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--human);
+    margin:0 0 18px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+  }
+  .eyebrow .tag { background:var(--ink); color:var(--paper); padding:2px 9px; border-radius:2px; letter-spacing:.1em; }
+  h1 { font-size:clamp(32px,5.2vw,48px); line-height:1.08; font-weight:700; letter-spacing:-.028em; margin:0 0 16px; text-wrap:balance; }
+  .runinfo { font-size:14px; color:var(--muted); margin:0; font-family:"IBM Plex Mono", monospace; }
+  .caveat {
+    margin-top:20px; border-left:3px solid var(--warn); background:var(--warn-bg);
+    padding:12px 16px; font-size:14px; line-height:1.6; color:var(--ink-2);
+  }
+
+  /* ── summary tiles ── */
+  /* gap 1px + 컨테이너 배경으로 구분선을 만들면 빈 셀이 회색 박스로 보인다.
+     타일마다 테두리를 주고 마이너스 마진으로 겹쳐 선을 합친다. */
+  .tiles {
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr));
+    margin-top:32px;
+  }
+  .tile {
+    background:var(--surface); padding:16px 18px;
+    border:1px solid var(--rule); margin:0 -1px -1px 0;
+  }
+  .tile dt {
+    font-family:"IBM Plex Mono", monospace; font-size:10px; font-weight:500;
+    letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:0 0 6px;
+  }
+  .tile dd { margin:0; font-size:24px; font-weight:600; line-height:1.2; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+  .tile dd .unit { font-size:14px; font-weight:400; color:var(--muted); margin-left:2px; }
+  .tile dd .sub { display:block; font-size:12px; font-weight:400; color:var(--muted); line-height:1.5; margin-top:2px; letter-spacing:0; }
+
+  /* ── sections ── */
+  section { padding-top:52px; }
+  .sec-head { border-top:2px solid var(--rule-2); padding-top:18px; margin-bottom:18px; }
+  .sec-eyebrow {
+    font-family:"IBM Plex Mono", monospace; font-size:10.5px; font-weight:600;
+    letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin:0 0 8px;
+  }
+  h2 {
+    font-size:clamp(22px,3vw,27px); line-height:1.24; font-weight:600;
+    letter-spacing:-.022em; margin:0; text-wrap:balance;
+  }
+  p { margin:0 0 14px; max-width:70ch; }
+  .lede { font-size:15px; color:var(--ink-2); font-weight:400; line-height:1.66; }
+  .lede .formula {
+    display:block; font-family:"IBM Plex Mono", monospace; font-size:13.5px;
+    color:var(--ink); margin-top:7px; letter-spacing:-.01em;
+  }
+
+  /* ── distribution bars ── */
+  /* 단일 grid — 모든 행이 같은 열 너비를 공유해야 막대 시작점이 일치한다.
+     행마다 grid를 두면 '확장' 배지가 있는 행만 이름 열이 넓어져 정렬이 깨진다. */
+  .dist {
+    display:grid; grid-template-columns:minmax(0,max-content) 1fr max-content;
+    column-gap:14px; row-gap:9px; align-items:center; margin-top:16px;
+  }
+  .dist-row { display:contents; }
+  .dist-name { font-size:14.5px; font-weight:500; display:flex; align-items:center; gap:7px; white-space:nowrap; }
+  /* 배지를 이름 열 오른쪽 끝으로 밀어 막대 직전에서 정렬 */
+  .dist-name .badge { margin-left:auto; }
+  @media (max-width:560px) {
+    .dist { column-gap:10px; }
+    .dist-name { font-size:13px; }
+    /* 좁은 화면에서는 배지를 숨겨 막대 공간을 확보한다.
+       확장 여부는 막대 색(--ai)과 하단 확장 안내 박스로 전달된다. */
+    .dist-name .badge { display:none; }
+  }
+  .dist-code { font-family:"IBM Plex Mono", monospace; font-weight:600; color:var(--muted); font-size:13px; }
+  .dist-track { background:var(--sunk); height:22px; border:1px solid var(--rule); position:relative; overflow:hidden; }
+  .dist-fill { height:100%; background:var(--ink-2); transition:width .5s cubic-bezier(.2,.8,.2,1); }
+  .dist-fill.ext { background:var(--ai); }
+  .dist-val { font-family:"IBM Plex Mono", monospace; font-size:13.5px; font-weight:600; text-align:right; white-space:nowrap; }
+  .dist-val .n { color:var(--muted); font-weight:400; font-size:12px; margin-left:5px; }
+
+  /* ── badges ── */
+  .badge {
+    display:inline-flex; align-items:center; gap:5px; font-family:"IBM Plex Mono", monospace;
+    font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+    padding:3px 8px; border-radius:2px; border:1px solid; white-space:nowrap;
+  }
+  .b-p1 { color:var(--hot); background:var(--hot-bg); border-color:var(--hot-line); }
+  .b-p2 { color:var(--warn); background:var(--warn-bg); border-color:var(--warn-line); }
+  .b-p3 { color:var(--muted); background:var(--sunk); border-color:var(--rule-2); }
+  .b-ext { color:var(--ai); background:var(--ai-bg); border-color:var(--ai-line); }
+  .b-draft { color:var(--warn); background:var(--warn-bg); border-color:var(--warn-line); }
+  .b-ok { color:var(--done); background:var(--done-bg); border-color:var(--done-line); }
+  .b-warn { color:var(--warn); background:var(--warn-bg); border-color:var(--warn-line); }
+  .b-tag { color:var(--ink-2); background:var(--sunk); border-color:var(--rule-2); text-transform:none; letter-spacing:.02em; }
+
+  /* ── notice ── */
+  .notice {
+    border-left:3px solid var(--human); background:var(--human-bg);
+    padding:14px 18px; font-size:14px; line-height:1.68; color:var(--ink-2); margin:16px 0 0;
+  }
+  .notice b { color:var(--ink); font-weight:600; }
+  .notice.info { border-color:var(--ai); background:var(--ai-bg); }
+  .notice.warn { border-color:var(--warn); background:var(--warn-bg); }
+
+  /* ── priority table ── */
+  .ptable { width:100%; border-collapse:collapse; margin-top:16px; font-size:14px; }
+  .ptable thead th {
+    font-family:"IBM Plex Mono", monospace; font-size:10.5px; font-weight:600;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+    text-align:left; padding:0 12px 9px; border-bottom:1px solid var(--rule-2); white-space:nowrap;
+  }
+  .ptable thead th.num { text-align:right; }
+  .ptable tbody td { padding:13px 12px; border-bottom:1px solid var(--rule); vertical-align:middle; }
+  .ptable tbody td.num { text-align:right; font-family:"IBM Plex Mono", monospace; font-variant-numeric:tabular-nums; }
+  .ptable tbody tr:hover { background:var(--sunk); }
+  .p-rank { font-family:"IBM Plex Mono", monospace; font-weight:600; color:var(--muted); }
+  .p-name { font-weight:600; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .p-score { font-size:16.5px; font-weight:600; }
+  .contrib { display:flex; gap:2px; height:7px; min-width:96px; }
+  .contrib i { display:block; height:100%; }
+  .c-f { background:var(--code); }
+  .c-s { background:var(--hot); }
+  .c-t { background:var(--ai); }
+  .contrib-legend { display:flex; gap:14px; margin-top:12px; font-size:11.5px; color:var(--muted); font-family:"IBM Plex Mono", monospace; flex-wrap:wrap; }
+  .contrib-legend span { display:inline-flex; align-items:center; gap:5px; }
+  .contrib-legend i { width:9px; height:9px; display:inline-block; }
+  .tbl-scroll { overflow-x:auto; }
+
+  /* ── topic detail ── */
+  .topics { display:grid; gap:14px; margin-top:16px; }
+  details.topic {
+    border:1px solid var(--rule); background:var(--surface); box-shadow:var(--shadow);
+  }
+  details.topic > summary {
+    padding:16px 20px; cursor:pointer; list-style:none; display:flex;
+    align-items:center; gap:12px; flex-wrap:wrap; user-select:none;
+  }
+  details.topic > summary::-webkit-details-marker { display:none; }
+  details.topic > summary::before {
+    content:"▸"; color:var(--muted); font-size:12px; transition:transform .18s; flex:none;
+  }
+  details.topic[open] > summary::before { transform:rotate(90deg); }
+  details.topic > summary:hover { background:var(--sunk); }
+  .topic-title { font-size:17px; font-weight:600; letter-spacing:-.012em; }
+  .topic-meta { margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .topic-body { padding:4px 20px 22px; border-top:1px solid var(--rule); }
+
+  .sub-h {
+    font-family:"IBM Plex Mono", monospace; font-size:10.5px; font-weight:600;
+    letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
+    margin:22px 0 10px; padding-bottom:7px; border-bottom:1px solid var(--rule);
+  }
+
+  /* ── hypotheses ── */
+  .hyp { border-left:2px solid var(--rule-2); padding:2px 0 2px 16px; margin-bottom:16px; }
+  .hyp-head { display:flex; gap:9px; align-items:baseline; flex-wrap:wrap; margin-bottom:6px; }
+  .hyp-id { font-family:"IBM Plex Mono", monospace; font-size:12px; font-weight:600; color:var(--ai); }
+  .hyp-text { font-size:15px; font-weight:500; }
+  .evid { background:var(--sunk); border:1px solid var(--rule); padding:10px 13px; margin-top:8px; font-size:13.5px; line-height:1.6; }
+  .evid-id { font-family:"IBM Plex Mono", monospace; font-size:11px; color:var(--muted); display:block; margin-bottom:3px; }
+  .evid-text { color:var(--ink-2); }
+
+  /* ── deliverables ── */
+  .deliv { border:1px solid var(--rule-2); background:var(--sunk); margin-bottom:12px; }
+  .deliv-head { padding:13px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .deliv-id { font-family:"IBM Plex Mono", monospace; font-size:12px; font-weight:600; color:var(--code); }
+  .deliv-title { font-size:15px; font-weight:600; flex:1 1 auto; min-width:180px; }
+  .btn {
+    font-family:"IBM Plex Mono", monospace; font-size:11px; font-weight:600;
+    letter-spacing:.06em; padding:6px 12px; border:1px solid var(--rule-2);
+    background:var(--surface); color:var(--ink-2); cursor:pointer; border-radius:2px;
+    white-space:nowrap; transition:background .15s, border-color .15s;
+  }
+  .btn:hover { background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  .btn:focus-visible { outline:2px solid var(--ai); outline-offset:2px; }
+  .deliv-body { padding:2px 16px 18px; border-top:1px solid var(--rule); background:var(--surface); }
+  .deliv-body h4 { font-size:14px; font-weight:600; margin:16px 0 7px; }
+  .deliv-body ul { margin:0 0 12px; padding-left:20px; }
+  .deliv-body li { margin-bottom:5px; font-size:14px; line-height:1.65; }
+  .deliv-body p { font-size:14px; margin:0 0 10px; }
+  .deliv-body table { width:100%; border-collapse:collapse; font-size:13.5px; margin:0 0 14px; }
+  .deliv-body th, .deliv-body td { padding:8px 10px; border:1px solid var(--rule); text-align:left; vertical-align:top; }
+  .deliv-body th { background:var(--sunk); font-weight:600; font-size:12.5px; }
+  .deliv-body code { font-family:"IBM Plex Mono", monospace; font-size:12.5px; background:var(--sunk); padding:1px 5px; border-radius:2px; }
+
+  /* ── validation strip ── */
+  .valid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px,1fr)); margin-top:16px; }
+  .valid-item {
+    background:var(--surface); padding:14px 16px;
+    border:1px solid var(--rule); margin:0 -1px -1px 0;
+  }
+  .valid-label { font-size:13.5px; font-weight:500; display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+  .valid-note { font-size:12.5px; color:var(--muted); line-height:1.55; }
+
+  footer {
+    margin-top:64px; padding-top:20px; border-top:2px solid var(--ink);
+    font-family:"IBM Plex Mono", monospace; font-size:11px; letter-spacing:.06em;
+    color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;
+  }
+
+  /* ── print ── */
+  #print-area { display:none; }
+  @media print {
+    body { background:#fff; color:#000; font-size:11pt; }
+    .wrap { max-width:none; padding:0; }
+    .btn, details.topic > summary::before { display:none !important; }
+    details.topic { break-inside:avoid; border-color:#ccc; box-shadow:none; }
+    details.topic > summary { background:#f5f5f5; }
+    a[href]::after { content:""; }
+    /* 단일 산출물 인쇄 모드 */
+    body.print-single > .wrap { display:none !important; }
+    body.print-single > #print-area { display:block !important; }
+    #print-area .deliv { border:none; background:#fff; }
+    #print-area .deliv-head { border-bottom:2px solid #000; padding-left:0; padding-right:0; }
+    #print-area .deliv-body { border:none; padding-left:0; padding-right:0; }
+    #print-area .print-meta {
+      font-family:"IBM Plex Mono", monospace; font-size:9pt; color:#555;
+      border-top:1px solid #ccc; margin-top:24pt; padding-top:8pt;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition:none !important; animation:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow"><span class="tag">VOC Report</span> <span id="hdr-date"></span></p>
+    <h1 id="hdr-title">VOC 분석 리포트</h1>
+    <p class="runinfo" id="hdr-run"></p>
+    <div id="hdr-caveat"></div>
+    <dl class="tiles" id="tiles"></dl>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <p class="sec-eyebrow">Distribution</p>
+      <h2>토픽별 접수 현황</h2>
+    </div>
+    <div class="dist" id="dist"></div>
+    <div id="ext-notice"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <p class="sec-eyebrow">Priority</p>
+      <h2>우선순위 산출 결과</h2>
+    </div>
+    <p class="lede">우선순위 산출식의 F·S·T 기여분을 막대그래프로 표기
+      <span class="formula">Priority = 0.4 × F(빈도) + 0.4 × S(심각도) + 0.2 × T(추세)</span>
+    </p>
+    <div class="tbl-scroll">
+      <table class="ptable">
+        <thead>
+          <tr>
+            <th>순위</th><th>토픽</th>
+            <th class="num">Priority</th>
+            <th>등급</th>
+            <th>F / S / T 기여분</th>
+            <th class="num">F</th><th class="num">S</th><th class="num">T</th>
+            <th class="num">건수</th>
+          </tr>
+        </thead>
+        <tbody id="ptable-body"></tbody>
+      </table>
+    </div>
+    <div class="contrib-legend">
+      <span><i class="c-f"></i> F 빈도 (가중 0.4)</span>
+      <span><i class="c-s"></i> S 심각도 (가중 0.4)</span>
+      <span><i class="c-t"></i> T 추세 (가중 0.2)</span>
+    </div>
+    <p class="notice">
+      <b>Priority는 산출식 기반 계산값으로, 실행 순서를 의미하지 않음.</b>
+      실행 순서는 본 산출 결과를 근거로 실행 난이도·리소스·부서 상황을 고려해 협의 후 결정.
+    </p>
+    <div id="trend-notice"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <p class="sec-eyebrow">Detail</p>
+      <h2>원인 가설 및 실행 산출물</h2>
+    </div>
+    <p class="lede">각 토픽 펼침 시 원인 가설·근거 발화·실행 산출물 초안 확인 가능
+      (산출물별 <b>[PDF로 저장]</b> 버튼 클릭 시 해당 문서만 단독 출력)</p>
+    <div class="topics" id="topics"></div>
+  </section>
+
+  <section id="sec-valid">
+    <div class="sec-head">
+      <p class="sec-eyebrow">Validation</p>
+      <h2>검증 절차 이행 내역</h2>
+    </div>
+    <div class="valid" id="valid"></div>
+  </section>
+
+  <footer>
+    <span id="ft-left">VOC AGENT · COMMERCE</span>
+    <span id="ft-right"></span>
+  </footer>
+</div>
+
+<div id="print-area"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   데이터 주입 지점.
+   PLAYBOOK 12단계에서 아래 한 줄의 null 을 report_data.json 의
+   내용(JSON 객체)으로 통째로 치환한다.
+   치환 대상 토큰: __REPORT_DATA__
+   ══════════════════════════════════════════════════════════════ */
+const DATA = /*__REPORT_DATA__*/ null;
+
+/* ── 최소 마크다운 렌더러 (제목/목록/표/굵게/코드/문단) ── */
+function mdToHtml(md) {
+  if (!md) return "";
+  const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const inline = s => esc(s)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+  const lines = md.split(/\r?\n/);
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (!line.trim()) { i++; continue; }
+
+    // 표
+    if (/^\s*\|/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i+1])) {
+      const cells = r => r.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+      const head = cells(line);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) { rows.push(cells(lines[i])); i++; }
+      out.push(
+        "<table><thead><tr>" + head.map(h => `<th>${inline(h)}</th>`).join("") +
+        "</tr></thead><tbody>" +
+        rows.map(r => "<tr>" + r.map(c => `<td>${inline(c)}</td>`).join("") + "</tr>").join("") +
+        "</tbody></table>"
+      );
+      continue;
+    }
+
+    // 제목
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { out.push(`<h4>${inline(h[2])}</h4>`); i++; continue; }
+
+    // 목록
+    if (/^\s*[-*]\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+        items.push(`<li>${inline(lines[i].replace(/^\s*[-*]\s+/, ""))}</li>`);
+        i++;
+      }
+      out.push(`<ul>${items.join("")}</ul>`);
+      continue;
+    }
+
+    // 문단
+    const para = [];
+    while (i < lines.length && lines[i].trim() && !/^\s*[-*#|]/.test(lines[i])) { para.push(lines[i]); i++; }
+    if (para.length) out.push(`<p>${inline(para.join(" "))}</p>`);
+  }
+  return out.join("");
+}
+
+const el = (tag, cls, html) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (html != null) n.innerHTML = html;
+  return n;
+};
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const gradeCls = g => g === "P1" ? "b-p1" : g === "P2" ? "b-p2" : "b-p3";
+
+function render(d) {
+  if (!d) {
+    document.getElementById("hdr-title").textContent = "데이터가 주입되지 않았습니다";
+    document.getElementById("hdr-run").textContent =
+      "PLAYBOOK 12단계에서 __REPORT_DATA__ 토큰을 report_data.json 내용으로 치환하세요.";
+    return;
+  }
+  const m = d.meta || {}, s = d.summary || {};
+
+  /* 헤더 */
+  document.title = (m.title || "VOC 분석 리포트");
+  document.getElementById("hdr-title").textContent = m.title || "VOC 분석 리포트";
+  document.getElementById("hdr-date").textContent = m.analyzed_at || "";
+  document.getElementById("hdr-run").textContent =
+    [m.input_file, m.record_count != null ? m.record_count + "건" : null, m.period]
+      .filter(Boolean).join(" · ");
+  if (m.caveat) {
+    document.getElementById("hdr-caveat").appendChild(el("div", "caveat", esc(m.caveat)));
+  }
+
+  /* 요약 타일 */
+  const tiles = document.getElementById("tiles");
+  (s.tiles || []).forEach(t => {
+    const box = el("div", "tile");
+    box.appendChild(el("dt", null, esc(t.label)));
+    box.appendChild(el("dd", null,
+      esc(t.value) +
+      (t.unit ? `<span class="unit">${esc(t.unit)}</span>` : "") +
+      (t.sub ? `<span class="sub">${esc(t.sub)}</span>` : "")
+    ));
+    tiles.appendChild(box);
+  });
+
+  /* 분포 */
+  const dist = document.getElementById("dist");
+  const maxPct = Math.max(...(d.distribution || []).map(x => x.pct || 0), 1);
+  (d.distribution || []).forEach(x => {
+    const row = el("div", "dist-row");
+    row.appendChild(el("div", "dist-name",
+      `<span class="dist-code">${esc(x.code)}</span>${esc(x.name)}` +
+      (x.is_extension ? ` <span class="badge b-ext">확장</span>` : "")
+    ));
+    const track = el("div", "dist-track");
+    const fill = el("div", "dist-fill" + (x.is_extension ? " ext" : ""));
+    fill.style.width = ((x.pct || 0) / maxPct * 100).toFixed(1) + "%";
+    track.appendChild(fill);
+    row.appendChild(track);
+    row.appendChild(el("div", "dist-val",
+      `${(x.pct ?? 0).toFixed(1)}%<span class="n">${x.count ?? 0}건</span>`));
+    dist.appendChild(row);
+  });
+
+  /* 확장 안내 */
+  if ((d.extensions || []).length) {
+    const drafts = d.extensions.filter(e => e.status === "draft");
+    const lines = d.extensions.map(e =>
+      `${esc(e.code)} ${esc(e.name)} — 실근거 ${e.real_evidence_count ?? 0}건 · ` +
+      (e.status === "confirmed" ? "확정" : "잠정(draft)")
+    ).join("<br>");
+    const box = el("p", "notice info",
+      `<b>본 실행 추가 확장 카테고리 ${d.extensions.length}개</b><br>${lines}` +
+      (drafts.length
+        ? `<br><br>잠정(draft) 카테고리는 실발화 근거 2건 미만으로 정식 확정 보류. Priority 해석 시 주의 요망.`
+        : "") +
+      `<br><br>확장 정의는 <code>configs/local_extensions.json</code>에만 저장. 원본 <code>configs/commerce_cs.json</code> 무변경.`
+    );
+    document.getElementById("ext-notice").appendChild(box);
+  }
+
+  /* Priority 표 */
+  const tb = document.getElementById("ptable-body");
+  (d.priority || []).forEach(p => {
+    const tr = document.createElement("tr");
+    const fC = p.f_contrib ?? (p.f_score ?? 0) * 0.4;
+    const sC = p.s_contrib ?? (p.s_score ?? 0) * 0.4;
+    const tC = p.t_contrib ?? (p.t_score ?? 0) * 0.2;
+    const tot = Math.max(fC + sC + tC, 1);
+    tr.innerHTML =
+      `<td class="p-rank">${p.rank ?? ""}</td>` +
+      `<td><div class="p-name"><span class="dist-code">${esc(p.code)}</span>${esc(p.name)}` +
+        (p.is_extension ? ` <span class="badge b-ext">확장</span>` : "") +
+        (p.status === "draft" ? ` <span class="badge b-draft">잠정</span>` : "") +
+      `</div></td>` +
+      `<td class="num"><span class="p-score">${(p.priority ?? 0).toFixed(1)}</span></td>` +
+      `<td><span class="badge ${gradeCls(p.grade)}">${esc(p.grade)}</span></td>` +
+      `<td><div class="contrib" title="F ${fC.toFixed(1)} / S ${sC.toFixed(1)} / T ${tC.toFixed(1)}">` +
+        `<i class="c-f" style="width:${fC/tot*100}%"></i>` +
+        `<i class="c-s" style="width:${sC/tot*100}%"></i>` +
+        `<i class="c-t" style="width:${tC/tot*100}%"></i></div></td>` +
+      `<td class="num">${(p.f_score ?? 0).toFixed(0)}</td>` +
+      `<td class="num">${(p.s_score ?? 0).toFixed(0)}</td>` +
+      `<td class="num">${p.trend_insufficient ? '<span style="color:var(--muted)">n/a</span>' : (p.t_score ?? 0).toFixed(0)}</td>` +
+      `<td class="num">${p.voc_count ?? 0}</td>`;
+    tb.appendChild(tr);
+  });
+
+  /* 추세 부족 경고 */
+  const insuf = (d.priority || []).filter(p => p.trend_insufficient).length;
+  if (insuf) {
+    document.getElementById("trend-notice").appendChild(el("p", "notice warn",
+      `<b>추세(T) 산출 불가 ${insuf}개 토픽.</b> 표본 부족 또는 기간 미달로 증감 측정 불가, 중립값 처리. ` +
+      `해당 토픽은 Priority가 사실상 F·S 2항으로 결정되므로 추세 근거 해석 불가.`
+    ));
+  }
+
+  /* 토픽 상세 */
+  const topics = document.getElementById("topics");
+  (d.topics || []).forEach(t => {
+    const det = el("details", "topic");
+    const sum = document.createElement("summary");
+    sum.innerHTML =
+      `<span class="dist-code">${esc(t.code)}</span>` +
+      `<span class="topic-title">${esc(t.name)}</span>` +
+      `<span class="topic-meta">` +
+        (t.grade ? `<span class="badge ${gradeCls(t.grade)}">${esc(t.grade)}</span>` : "") +
+        (t.priority != null ? `<span class="mono" style="font-size:13px;color:var(--muted)">Priority ${t.priority.toFixed(1)}</span>` : "") +
+        `<span class="mono" style="font-size:12px;color:var(--muted)">가설 ${(t.hypotheses||[]).length} · 산출물 ${(t.deliverables||[]).length}</span>` +
+      `</span>`;
+    det.appendChild(sum);
+
+    const body = el("div", "topic-body");
+
+    if ((t.hypotheses || []).length) {
+      body.appendChild(el("div", "sub-h", "원인 가설"));
+      t.hypotheses.forEach(h => {
+        const hb = el("div", "hyp");
+        hb.appendChild(el("div", "hyp-head",
+          `<span class="hyp-id">${esc(h.id)}</span>` +
+          `<span class="hyp-text">${esc(h.text)}</span>` +
+          (h.cause_tags || []).map(c => `<span class="badge b-tag">${esc(c)}</span>`).join(" ")
+        ));
+        (h.evidence || []).forEach(ev => {
+          hb.appendChild(el("div", "evid",
+            `<span class="evid-id">${esc(ev.voc_id)}</span>` +
+            `<span class="evid-text">${esc(ev.text)}</span>`
+          ));
+        });
+        body.appendChild(hb);
+      });
+    }
+
+    if ((t.deliverables || []).length) {
+      body.appendChild(el("div", "sub-h", "실행 산출물 초안"));
+      t.deliverables.forEach((v, idx) => {
+        const box = el("div", "deliv");
+        const head = el("div", "deliv-head",
+          `<span class="deliv-id">${esc(v.id)}</span>` +
+          `<span class="deliv-title">${esc(v.title)}</span>` +
+          (v.route ? `<span class="badge b-tag">${esc(v.route)}</span>` : "") +
+          (v.owner ? `<span class="badge b-tag">${esc(v.owner)}</span>` : "")
+        );
+        const btn = el("button", "btn", "PDF로 저장");
+        btn.type = "button";
+        btn.addEventListener("click", () => printDeliverable(t, v));
+        head.appendChild(btn);
+        box.appendChild(head);
+        box.appendChild(el("div", "deliv-body", mdToHtml(v.body_md || "")));
+        body.appendChild(box);
+      });
+    }
+
+    det.appendChild(body);
+    topics.appendChild(det);
+  });
+
+  /* 검증 */
+  const valid = document.getElementById("valid");
+  (d.validation || []).forEach(v => {
+    const item = el("div", "valid-item");
+    const ok = v.status === "pass";
+    item.appendChild(el("div", "valid-label",
+      `<span class="badge ${ok ? "b-ok" : "b-warn"}">${ok ? "통과" : "주의"}</span>${esc(v.label)}`));
+    if (v.note) item.appendChild(el("div", "valid-note", esc(v.note)));
+    valid.appendChild(item);
+  });
+  if (!(d.validation || []).length) document.getElementById("sec-valid").style.display = "none";
+
+  /* 푸터 */
+  document.getElementById("ft-right").textContent =
+    [m.generator || "voc-agent-commerce", m.analyzed_at].filter(Boolean).join(" · ");
+}
+
+/* 단일 산출물 인쇄 */
+function printDeliverable(topic, v) {
+  const area = document.getElementById("print-area");
+  const meta = DATA && DATA.meta ? DATA.meta : {};
+  area.innerHTML =
+    `<div class="deliv">` +
+      `<div class="deliv-head">` +
+        `<span class="deliv-id">${esc(v.id)}</span>` +
+        `<span class="deliv-title">${esc(v.title)}</span>` +
+      `</div>` +
+      `<div class="deliv-body">` +
+        `<p><strong>대상 토픽</strong> ${esc(topic.code)} ${esc(topic.name)}` +
+        (v.route ? ` · <strong>전달처</strong> ${esc(v.route)}` : "") +
+        (v.owner ? ` · <strong>담당</strong> ${esc(v.owner)}` : "") + `</p>` +
+        mdToHtml(v.body_md || "") +
+        `<div class="print-meta">` +
+          `voc-agent-commerce · 분석 ${esc(meta.analyzed_at || "")} · 입력 ${esc(meta.input_file || "")}<br>` +
+          `본 문서는 VOC 분석 기반 <strong>초안</strong>. 수치·담당·일정은 내부 확인 후 확정 요망.` +
+        `</div>` +
+      `</div>` +
+    `</div>`;
+  document.body.classList.add("print-single");
+  const cleanup = () => {
+    document.body.classList.remove("print-single");
+    area.innerHTML = "";
+    window.removeEventListener("afterprint", cleanup);
+  };
+  window.addEventListener("afterprint", cleanup);
+  window.print();
+  setTimeout(() => { if (document.body.classList.contains("print-single")) cleanup(); }, 1500);
+}
+
+render(DATA);
+</script>
+</body>
+</html>
