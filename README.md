@@ -322,8 +322,10 @@ Priority는 **0~100 스케일**이다.
 voc-agent-commerce/
 ├── PLAYBOOK.md              ← 실행 지시문 (이 도구의 핵심)
 ├── EXTENDING.md             ← 택소노미 확장 가이드
-├── PORTING_TO_OTHER_DOMAINS.md ← 타 도메인 이식 설계 (미구현)
 ├── candidate_extensions.md  ← 미검증 관찰 기록
+├── docs/                    ← 설계 기록 보관소 (실행에 사용하지 않음)
+│   ├── PORTING_TO_OTHER_DOMAINS.md ← 타 도메인 이식 설계 (미구현)
+│   └── PORTING_PROMPT.md    ← 이식 착수용 프롬프트
 ├── configs/
 │   ├── commerce_cs.json     ← 원본 config (수정 금지)
 │   └── local_extensions.json← 사용자 확장 (여기에만 저장)
@@ -372,8 +374,10 @@ Priority = 0.4 × F_score + 0.4 × S_score + 0.2 × T_score
 - **이 도구는 커머스 CS 전용이다.** 은행·병원·통신 등 다른 도메인으로 이식하려면
   조직 고유의 실행 지식(Action Playbook·Metric Dictionary)이 필요하며,
   이는 VOC 데이터에서 도출할 수 없다. 어디가 막히고 무엇을 설정해야 하는지는
-  [`PORTING_TO_OTHER_DOMAINS.md`](PORTING_TO_OTHER_DOMAINS.md)에 설계 문서로 정리했다.
+  [`docs/PORTING_TO_OTHER_DOMAINS.md`](docs/PORTING_TO_OTHER_DOMAINS.md)에 설계 문서로 정리했다.
+  실제 착수 시 쓸 프롬프트는 [`docs/PORTING_PROMPT.md`](docs/PORTING_PROMPT.md)에 있다.
   (설계만 완료, 미구현 — 실제 조직 문서로 검증할 수 없어 구현을 보류했다)
+  **`docs/`는 설계 기록이며 커머스 실행에 사용하지 않는다.**
 
 ---
 
