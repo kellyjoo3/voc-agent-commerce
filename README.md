@@ -21,7 +21,7 @@ PLAYBOOK.md를 따라 [내 파일] 을 분석해줘.
 
 시작 전 아래 3가지를 먼저 확인해서 보고할 것:
 1. configs/commerce_cs.json 의 대분류 개수 (정답: 10개 + 기타)
-2. configs/commerce_cs.json 의 playbook.actions 개수 (정답: 14개)
+2. configs/commerce_cs.json 의 playbook.actions 개수 (정답: 28개)
 3. scripts/priority_calc.py 를 실제로 실행할 수 있는 환경인지
 
 진행 중 반드시 지킬 것:
@@ -33,14 +33,17 @@ PLAYBOOK.md를 따라 [내 파일] 을 분석해줘.
   · 실행할 수 없으면 "미실행"이라고 리포트에 명시하고 위 공식으로 계산
   · 절대 자기만의 다른 공식을 쓰지 말 것
 - 등급은 P1 = 상위 3개 AND Priority >= 50. 심각하다는 이유로 올리지 말 것
-- 리포트는 templates/report_template.html 의
-  "/*__REPORT_DATA__*/ null" 을 치환해서 만들 것. HTML 을 새로 작성하지 말 것
+- 리포트는 templates/report_template.html 파일을 읽어서
+  "/*__REPORT_DATA__*/ null" 의 null 만 데이터로 치환할 것
+  · HTML·CSS·JavaScript 를 새로 쓰거나 압축하거나 줄이지 말 것
+  · 이번에 안 쓰이는 코드도 그대로 둘 것 (확장 카테고리 배지 등)
 - 원인 가설의 근거는 voc_id 와 함께 인용하고, 귀책태그 6종 중에서 붙일 것
 
 마지막에 아래를 자가 점검해서 보고할 것:
 - 산출된 대분류가 A~J 체계인가
 - F_score 가 20% 상한 공식과 일치하는가 (한 토픽 골라 검산)
-- report.html 에 "const DATA = {" 와 "sec-eyebrow" 문자열이 있는가
+- report.html 에 "const DATA = {" "sec-eyebrow" "is_extension" "잠정"
+  네 문자열이 모두 있는가 (뒤 두 개가 없으면 템플릿 JS 를 재작성한 것)
 ```
 
 > **왜 이렇게 하나요?**
@@ -85,7 +88,7 @@ GitHub 페이지 URL을 그대로 가져오면 렌더링된 HTML만 얻고 실�
 | 확인 항목 | 정답 |
 |---|---|
 | 대분류(taxonomy) 개수 | **10개 (A~J) + 기타** |
-| `playbook.actions` 개수 | **14개** |
+| `playbook.actions` 개수 | **28개** (A:4 B:3 C:5 D:2 E:2 F:2 G:2 H:3 I:3 J:2) |
 | `scripts/priority_calc.py` 존재 여부 | **있음** |
 
 **하나라도 다르면 파일을 제대로 읽지 못한 것이다. 중단하고 사용자에게 알린다.**
@@ -144,8 +147,16 @@ Priority는 **0~100 스케일**이다.
 
 ### 12단계 — 리포트 HTML을 새로 작성하지 마라
 
-`templates/report_template.html`의 `/*__REPORT_DATA__*/ null`을 치환하는 방식만 쓴다.
-완료 후 `output/report.html`에서 아래 4개 문자열을 확인해 사용자에게 보고한다.
+**템플릿 파일을 읽어 문자열 하나만 바꾼 결과를 저장한다.**
+`/*__REPORT_DATA__*/ null` 에서 `null`을 데이터 JSON으로 치환하는 것이 전부다.
+
+> **CSS·JavaScript를 다시 쓰지 마라.** 보기에 같아 보이도록 재작성하거나, 짧게
+> 압축하거나, 필요 없어 보이는 코드를 빼지 마라. 템플릿 JS에는 이번 데이터에
+> 안 쓰이더라도 반드시 남아 있어야 하는 처리가 들어 있다 — 확장 카테고리 배지,
+> 잠정(draft) 표기, 확장 안내 박스 등이다. 이것들을 빼면 다음 실행에서
+> **근거가 부족한 카테고리가 확정된 것처럼 보인다.**
+
+완료 후 `output/report.html`에서 아래 6개 문자열을 확인해 사용자에게 보고한다.
 
 | 확인 문자열 | 없으면 |
 |---|---|
@@ -153,6 +164,11 @@ Priority는 **0~100 스케일**이다.
 | `sec-eyebrow` | 템플릿 미사용 |
 | `dist-track` | 템플릿 미사용 |
 | `print-single` | 템플릿 미사용 |
+| `is_extension` | **JS를 재작성함** — 확장 카테고리 배지가 사라졌다 |
+| `잠정` | **JS를 재작성함** — draft 표기가 사라졌다 |
+
+마지막 두 개가 없으면 파일을 읽어 치환한 것이 아니라 **새로 쓴 것**이다.
+템플릿을 다시 읽어 치환부터 하라.
 
 직접 작성하면 **잠정(draft) 배지 · "Priority ≠ 실행순서" 경고 · F/S/T 기여분 분해 ·
 추세 산출 불가 경고 · 검증 이행 내역 · 산출물별 PDF 출력**이 전부 사라진다.
