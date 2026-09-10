@@ -322,6 +322,7 @@ Priority는 **0~100 스케일**이다.
 voc-agent-commerce/
 ├── PLAYBOOK.md              ← 실행 지시문 (이 도구의 핵심)
 ├── EXTENDING.md             ← 택소노미 확장 가이드
+├── PORTING_TO_OTHER_DOMAINS.md ← 타 도메인 이식 설계 (미구현)
 ├── candidate_extensions.md  ← 미검증 관찰 기록
 ├── configs/
 │   ├── commerce_cs.json     ← 원본 config (수정 금지)
@@ -368,6 +369,11 @@ Priority = 0.4 × F_score + 0.4 × S_score + 0.2 × T_score
 - Trend 계산은 `created_at`이 있을 때만 동작한다. 합성 타임스탬프를 사용한 경우 Trend 수치는 실측이 아니다.
 - Priority 수식에 Business Impact(매출·이탈 영향)는 포함되지 않는다. VOC 분석의 책임 범위를 정확히 그었기 때문이다 (SPEC §1-A). 사업 데이터 확보 시 `0.3F+0.3S+0.2T+0.2B`로 확장 가능하다.
 - 원인 규명은 주문 DB·택배 API 데이터와의 결합이 있어야 정확하다. 텍스트만으로는 가설 수준이다.
+- **이 도구는 커머스 CS 전용이다.** 은행·병원·통신 등 다른 도메인으로 이식하려면
+  조직 고유의 실행 지식(Action Playbook·Metric Dictionary)이 필요하며,
+  이는 VOC 데이터에서 도출할 수 없다. 어디가 막히고 무엇을 설정해야 하는지는
+  [`PORTING_TO_OTHER_DOMAINS.md`](PORTING_TO_OTHER_DOMAINS.md)에 설계 문서로 정리했다.
+  (설계만 완료, 미구현 — 실제 조직 문서로 검증할 수 없어 구현을 보류했다)
 
 ---
 
