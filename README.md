@@ -16,6 +16,9 @@ Python 설치, API 키, 별도 과금 없이 동작한다.
 https://github.com/kellyjoo3/voc-agent-commerce 를 clone하고
 PLAYBOOK.md를 따라 [내 파일] 을 분석해줘.
 
+분석 대상은 위에 적은 [내 파일] 하나뿐이다.
+리포 안의 examples/sample_voc_50.csv 는 형식 참고용이므로 분석하지 말 것.
+
 시작 전 아래 3가지를 먼저 확인해서 보고할 것:
 1. configs/commerce_cs.json 의 대분류 개수 (정답: 10개 + 기타)
 2. configs/commerce_cs.json 의 playbook.actions 개수 (정답: 14개)
@@ -89,7 +92,16 @@ GitHub 페이지 URL을 그대로 가져오면 렌더링된 HTML만 얻고 실�
 임의로 택소노미를 만들어 진행하지 않는다. 파일을 못 읽었으면 "못 읽었다"고 보고하는 것이
 잘못된 결과를 내놓는 것보다 낫다.
 
-## 3단계 — PLAYBOOK.md 실행
+## 3단계 — 분석 대상 파일 확인 🛑
+
+**사용자가 분석할 파일을 지정하지 않았다면 먼저 물어보고 답을 받은 뒤 진행한다.**
+
+이 리포의 `examples/sample_voc_50.csv`는 **형식 참고용 합성 데이터**다.
+리포에 CSV가 하나뿐이라는 이유로 그것을 기본 분석 대상으로 삼지 마라.
+사용자가 원하지 않은 가짜 데이터 리포트를 받고, 파이프라인이 불필요하게
+한 번 더 도는 낭비가 발생한다.
+
+## 4단계 — PLAYBOOK.md 실행
 
 `PLAYBOOK.md`를 처음부터 끝까지 읽고 **00단계부터 순서대로** 실행한다.
 🛑 STOP 표시가 있는 단계에서는 실제로 멈추고 사용자 확인을 받는다.
@@ -311,8 +323,8 @@ voc-agent-commerce/
 │   └── domain_filter.py     ← 도메인 필터 원본 스크립트
 ├── scripts/
 │   └── priority_calc.py     ← F/S/T/Priority 계산 전용
-├── data/
-│   └── ecommerce_voc_sample.csv ← 테스트용 샘플 50건
+├── examples/
+│   └── sample_voc_50.csv     ← 형식 참고용 합성 데이터 (기본 분석 대상 아님)
 └── output/                  ← 분석 결과 저장 (AI가 생성)
 ```
 
