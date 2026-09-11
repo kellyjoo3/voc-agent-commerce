@@ -380,7 +380,15 @@ function mdToHtml(md) {
   const lines = md.split(/\r?\n/);
   const out = [];
   let i = 0;
+  /* 가드: 어떤 입력이 와도 무한루프로 브라우저가 멈추지 않도록 상한을 둔다.
+     아래 문단 분기의 else 와 함께 이중 안전장치. */
+  let guard = 0;
+  const guardMax = lines.length * 5 + 100;
   while (i < lines.length) {
+    if (++guard > guardMax) {
+      out.push('<p><em>[렌더링 중단 — 예기치 못한 서식이 반복되었습니다]</em></p>');
+      break;
+    }
     const line = lines[i];
 
     if (!line.trim()) { i++; continue; }
@@ -419,7 +427,16 @@ function mdToHtml(md) {
     // 문단
     const para = [];
     while (i < lines.length && lines[i].trim() && !/^\s*[-*#|]/.test(lines[i])) { para.push(lines[i]); i++; }
-    if (para.length) out.push(`<p>${inline(para.join(" "))}</p>`);
+    if (para.length) {
+      out.push(`<p>${inline(para.join(" "))}</p>`);
+    } else {
+      /* 한 줄도 소비하지 못한 경우 — 반드시 전진시킨다.
+         예: "**[AI 추론 · 협의 후 확정]** ..." 처럼 `*`로 시작하지만
+         목록(`* `)도 아닌 줄. 전진시키지 않으면 무한루프가 되어 브라우저가 멈춘다.
+         inline()이 **굵게**를 <strong>으로 변환하므로 출력은 의도대로 나온다. */
+      out.push(`<p>${inline(lines[i])}</p>`);
+      i++;
+    }
   }
   return out.join("");
 }
