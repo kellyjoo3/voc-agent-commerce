@@ -394,7 +394,8 @@ voc-agent-commerce/
 ├── candidate_extensions.md  ← 미검증 관찰 기록
 ├── docs/                    ← 설계 기록 보관소 (실행에 사용하지 않음)
 │   ├── PORTING_TO_OTHER_DOMAINS.md ← 타 도메인 이식 설계 (미구현)
-│   └── PORTING_PROMPT.md    ← 이식 착수용 프롬프트
+│   ├── PORTING_PROMPT.md    ← 이식 착수용 프롬프트
+│   └── RETROSPECTIVE.md     ← 프로젝트 회고
 ├── configs/
 │   ├── commerce_cs.json     ← 원본 config (수정 금지)
 │   └── local_extensions.json← 사용자 확장 (여기에만 저장)
